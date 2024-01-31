@@ -1,0 +1,13 @@
+GET localhost:9200/itemindex/_search?size=100
+
+###
+GET localhost:9200/itemindex/_search?size=100
+Content-Type: application/json
+
+{
+"aggs": {
+    "categories": {
+      "terms": { "field": "category" }
+    }
+  }
+}
