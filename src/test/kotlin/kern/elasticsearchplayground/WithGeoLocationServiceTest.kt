@@ -1,25 +1,14 @@
 package kern.elasticsearchplayground
 
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.util.TestPropertyValues
-import org.springframework.context.ApplicationContextInitializer
-import org.springframework.context.ConfigurableApplicationContext
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchAggregations
 import org.springframework.test.context.ActiveProfiles
-import org.springframework.test.context.ContextConfiguration
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
-import org.testcontainers.containers.wait.strategy.HostPortWaitStrategy
-import org.testcontainers.elasticsearch.ElasticsearchContainer
-import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import java.time.Duration
-import java.util.*
 
 @SpringBootTest(classes = [TestElasticsearchPlaygroundApplication::class])
 @Testcontainers
@@ -43,7 +32,7 @@ class WithGeoLocationServiceTest {
 
         val result = withGeoLocationService.searchOnlyWithNativeQuery()
 
-        result shouldHaveSize 1
+        result shouldHaveSize 3
     }
 
     @Test
@@ -52,6 +41,24 @@ class WithGeoLocationServiceTest {
 
         val result = withGeoLocationService.searchWithNativeQueryMixedWithCriteriaQueryAndGeoLocation()
 
-        result shouldHaveSize 1
+        result shouldHaveSize 3
+    }
+
+    @Test
+    fun searchWithNativeQueryMixedWithCriteriaQueryAndGeoLocationAndAggregation() {
+        withGeoLocationService.seedSampleData()
+
+        val result = withGeoLocationService.searchWithNativeQueryMixedWithCriteriaQueryAndGeoLocationAndAggregation()
+
+        result shouldHaveSize 3 //works with spring-data-elasticsearch 5.3.0-M2
+
+        val foundAggregationIds = (result.aggregations as ElasticsearchAggregations)
+            .aggregationsAsMap()["exampleAggregation"]
+                ?.aggregation()
+                ?.aggregate?.lterms()
+                ?.buckets()?.array()
+                ?.map { it.key() }?.toSet() ?: emptySet()
+
+        foundAggregationIds shouldContainExactlyInAnyOrder listOf(1L, 2L)
     }
 }

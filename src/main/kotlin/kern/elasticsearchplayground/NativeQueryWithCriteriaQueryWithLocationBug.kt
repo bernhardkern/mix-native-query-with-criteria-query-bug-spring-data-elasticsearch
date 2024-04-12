@@ -2,6 +2,8 @@ package kern.elasticsearchplayground
 
 import co.elastic.clients.elasticsearch._types.GeoLocation
 import co.elastic.clients.elasticsearch._types.LatLonGeoLocation
+import co.elastic.clients.elasticsearch._types.aggregations.Aggregation
+import co.elastic.clients.elasticsearch._types.aggregations.TermsAggregation
 import co.elastic.clients.elasticsearch._types.query_dsl.GeoDistanceQuery
 import org.springframework.data.annotation.Id
 import org.springframework.data.elasticsearch.annotations.Document
@@ -16,7 +18,7 @@ import org.springframework.stereotype.Service
 import java.util.*
 
 @Document(indexName = "with_geo_location_index", createIndex = true)
-class WithGeoLocation(@Id val id: UUID, val location: GeoPoint)
+class WithGeoLocation(@Id val id: UUID, val location: GeoPoint, val aggregationId: Long)
 
 interface WithGeoLocationRepository : ElasticsearchRepository<WithGeoLocation, UUID>
 
@@ -31,8 +33,10 @@ class WithGeoLocationService(val repository: WithGeoLocationRepository, val oper
     fun seedSampleData() {
         repository.saveAll(
             listOf(
-                WithGeoLocation(UUID.randomUUID(), pointWeAreLookingFor),
-                WithGeoLocation(UUID.randomUUID(), otherPoint),
+                WithGeoLocation(UUID.randomUUID(), pointWeAreLookingFor, 1L),
+                WithGeoLocation(UUID.randomUUID(), pointWeAreLookingFor, 1L),
+                WithGeoLocation(UUID.randomUUID(), pointWeAreLookingFor, 2L),
+                WithGeoLocation(UUID.randomUUID(), otherPoint, 3L),
             )
         )
     }
@@ -49,6 +53,19 @@ class WithGeoLocationService(val repository: WithGeoLocationRepository, val oper
     fun searchWithNativeQueryMixedWithCriteriaQueryAndGeoLocation(): SearchHits<WithGeoLocation> {
         val cq = CriteriaQuery(Criteria("location").within(pointWeAreLookingFor, "1km"))
         val nq = NativeQueryBuilder().withQuery(cq).build()
+
+        return operations.search(nq, WithGeoLocation::class.java)
+    }
+
+    fun searchWithNativeQueryMixedWithCriteriaQueryAndGeoLocationAndAggregation(): SearchHits<WithGeoLocation> {
+        val cq = CriteriaQuery(Criteria("location").within(pointWeAreLookingFor, "1km"))
+        val nq = NativeQueryBuilder()
+            .withQuery(cq)
+            .withAggregation(
+                "exampleAggregation",
+                Aggregation.of { it.terms(TermsAggregation.Builder().field("aggregationId").size(20).build()) },
+            )
+            .build()
 
         return operations.search(nq, WithGeoLocation::class.java)
     }
